@@ -1,7 +1,6 @@
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import kotlin.math.sin
 
 class MainKtTest {
     private val flights: FlightPlan = mutableMapOf()
