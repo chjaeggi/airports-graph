@@ -91,20 +91,20 @@ fun FlightPlan.cost(from: Airport, to: Airport) = this[from]?.firstOrNull { it.t
 
 fun FlightPlan.dfs(from: Airport): List<Airport> {
     val seen = mutableSetOf<Airport>()
-    seen += from
-    dfsHelper(from, seen)
-    return seen.toList()
-}
 
-private fun FlightPlan.dfsHelper(from: Airport, seen: MutableSet<Airport>) {
-    this[from]?.let { routes ->
-        routes.forEach {
-            if (it.to !in seen) {
-                seen += it.to
-                dfsHelper(it.to, seen)
+    fun traverseChildrenFirst(from: Airport) {
+        this[from]?.let { routes ->
+            routes.forEach {
+                if (it.to !in seen) {
+                    seen += it.to
+                    traverseChildrenFirst(it.to)
+                }
             }
         }
     }
+    seen += from
+    traverseChildrenFirst(from)
+    return seen.toList()
 }
 
 fun FlightPlan.bfs(from: Airport): List<Airport> {
