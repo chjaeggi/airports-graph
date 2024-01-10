@@ -1,7 +1,7 @@
 import java.util.*
 import kotlin.collections.ArrayDeque
 
-typealias FlightPlan = MutableMap<Airport, List<Route>>
+typealias FlightPlan = Map<Airport, List<Route>>
 
 data class Airport(val name: String)
 data class Route(val from: Airport, val to: Airport, val cost: Double)
@@ -20,6 +20,36 @@ enum class EdgeType {
     Directed, Undirected
 }
 
+fun main() {
+    val flightPlan = flightPlan()
+
+    flightPlan.forEach {
+        println("${it.key.name} --> ${it.value.map { it.to.name }}")
+    }
+    println("----------------------------------------------------")
+
+    println(flightPlan.cost(singapore, detroit) ?: "No direct flight found :(")
+    println(flightPlan.cost(singapore, hongKong) ?: "No direct flight found :(")
+    println("----------------------------------------------------")
+
+    val traversalStart = dc
+    println("Basic DFS from ${traversalStart.name}:")
+    println(flightPlan.dfs(traversalStart))
+    println("----------------------------------------------------")
+
+    println("Basic BFS from ${traversalStart.name}:")
+    println(flightPlan.bfs(traversalStart))
+    println("----------------------------------------------------")
+
+    val dijkstraStart = singapore
+    val dijkstraDest = detroit
+    val costs = flightPlan.cheapestCostsFrom(dijkstraStart)
+    println("The cheapest flight from ${dijkstraStart.name} to ${dijkstraDest.name} costs: ${costs[dijkstraDest]}")
+    println("All these airports can be reached from ${dijkstraStart.name}: ")
+    costs.forEach { (airport, cost) -> println("${airport.name} -> $cost") }
+    println("----------------------------------------------------")
+}
+
 private val singapore = Airport("Singapore")
 private val hongKong = Airport("Hong Kong")
 private val tokyo = Airport("Tokyo")
@@ -29,41 +59,7 @@ private val sanFran = Airport("San Francisco")
 private val austin = Airport("Austin")
 private val seattle = Airport("Seattle")
 
-fun main() {
-
-    val flights: FlightPlan = mutableMapOf()
-    flights.connectFlights()
-
-    flights.forEach {
-        println("${it.key.name} --> ${it.value.map { it.to.name }}")
-    }
-    println("----------------------------------------------------")
-
-    println(flights.weight(singapore, detroit) ?: "No direct flight found :(")
-    println(flights.weight(singapore, hongKong) ?: "No direct flight found :(")
-    println("----------------------------------------------------")
-
-    val traversalStart = dc
-    println("Basic DFS from ${traversalStart.name}:")
-    println(flights.dfs(traversalStart))
-    println("----------------------------------------------------")
-
-    println("Basic BFS from ${traversalStart.name}:")
-    println(flights.bfs(traversalStart))
-    println("----------------------------------------------------")
-
-    val dijkstraStart = singapore
-    val dijkstraDest = detroit
-
-    print("The cheapest flight from ${dijkstraStart.name} to ${dijkstraDest.name} costs: ")
-    flights.cheapestFlight(dijkstraStart, dijkstraDest)
-    print("All these airports can be reached from ${dijkstraStart.name}: ")
-    flights.cheapestFlight(dijkstraStart)
-    println("----------------------------------------------------")
-
-}
-
-private fun FlightPlan.connectFlights() {
+private fun flightPlan(): FlightPlan = buildMap {
     add(EdgeType.Undirected, Route(singapore, hongKong, 300.0))
     add(EdgeType.Undirected, Route(tokyo, singapore, 500.0))
     add(EdgeType.Undirected, Route(hongKong, tokyo, 250.0))
@@ -79,22 +75,19 @@ private fun FlightPlan.connectFlights() {
     add(EdgeType.Undirected, Route(dc, tokyo, 300.0))
 }
 
-fun FlightPlan.add(type: EdgeType, route: Route) {
-    if (route.from in keys) {
-        this[route.from] = this[route.from]!! + route
-    } else {
-        this[route.from] = listOf(route)
-    }
+fun MutableMap<Airport, List<Route>>.add(type: EdgeType, route: Route) {
+    val fromRoutes = this[route.from] ?: emptyList()
+    this[route.from] = fromRoutes + route
+
     if (type == EdgeType.Undirected) {
-        if (route.to in keys) {
-            this[route.to] = this[route.to]!! + Route(route.to, route.from, route.cost)
-        } else {
-            this[route.to] = listOf(Route(route.to, route.from, route.cost))
-        }
+        val toRoutes = this[route.to] ?: emptyList()
+        this[route.to] = toRoutes + route.invert()
     }
 }
 
-fun FlightPlan.weight(from: Airport, to: Airport) = this[from]?.firstOrNull { it.to == to }?.cost
+private fun Route.invert() = copy(from = to, to = from)
+
+fun FlightPlan.cost(from: Airport, to: Airport) = this[from]?.firstOrNull { it.to == to }?.cost
 
 fun FlightPlan.dfs(from: Airport): List<Airport> {
     val seen = mutableSetOf<Airport>()
@@ -104,8 +97,8 @@ fun FlightPlan.dfs(from: Airport): List<Airport> {
 }
 
 private fun FlightPlan.dfsHelper(from: Airport, seen: MutableSet<Airport>) {
-    this[from]?.let {
-        it.forEach {
+    this[from]?.let { routes ->
+        routes.forEach {
             if (it.to !in seen) {
                 seen += it.to
                 dfsHelper(it.to, seen)
@@ -122,8 +115,8 @@ fun FlightPlan.bfs(from: Airport): List<Airport> {
         val current = queue.removeLast()
         if (current !in seen) {
             seen += current
-            this[current]?.let {
-                it.forEach {
+            this[current]?.let { routes ->
+                routes.forEach {
                     queue.addFirst(it.to)
                 }
             }
@@ -133,38 +126,22 @@ fun FlightPlan.bfs(from: Airport): List<Airport> {
 }
 
 // dijkstra
-fun FlightPlan.cheapestFlight(from: Airport, to: Airport? = null): Double? {
-    val seen = mutableSetOf<Airport>()
+fun FlightPlan.cheapestCostsFrom(airport: Airport): Map<Airport, Double> {
     val queue = PriorityQueue<Flight>()
+    queue.addAll(this[airport]?.map { Flight(it, it.cost) } ?: emptyList()) // add starting outbounds from source
+    val seen = mutableSetOf<Airport>()
     val costPerDestination = mutableMapOf<Airport, Double>()
-
-    queue.addAll(this[from]?.map { Flight(it, it.cost) } ?: emptyList()) // add starting outbounds from source
     while (queue.isNotEmpty()) { // always find the local cheapest path (min heap property by priority queue)
         val currentFlight = queue.poll()
         if (currentFlight.route.to !in seen) {
-            if (currentFlight.route.to != from) costPerDestination[currentFlight.route.to] = currentFlight.totalCost
-            this[currentFlight.route.to]?.let {
-                queue += it
+            if (currentFlight.route.to != airport) costPerDestination[currentFlight.route.to] = currentFlight.totalCost
+            this[currentFlight.route.to]?.let { routes ->
+                queue += routes
                     .filterNot { it.to in seen } // prevent flying back
-                    .map {
-                        Flight(it, currentFlight.totalCost + it.cost)
-                    }
+                    .map { Flight(it, currentFlight.totalCost + it.cost) }
             }
             seen += currentFlight.route.to
         }
     }
-
-    if (to != null) {
-        // desired final airport
-        println(costPerDestination[to] ?: "Airport ${to.name} not reachable from ${from.name}")
-        return costPerDestination[to]
-    } else {
-        // show all the reachable airports for source
-        println(costPerDestination.map {
-            buildString {
-                append("${it.key.name} -> ${it.value}")
-            }
-        })
-    }
-    return null
+    return costPerDestination
 }
