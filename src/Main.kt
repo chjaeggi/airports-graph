@@ -1,6 +1,8 @@
 import java.util.*
 import kotlin.collections.ArrayDeque
 
+typealias FlightPlan = MutableMap<Airport, List<Route>>
+
 data class Airport(val name: String)
 data class Route(val from: Airport, val to: Airport, val cost: Double)
 data class Flight(val route: Route, val totalCost: Double) : Comparable<Flight> {
@@ -18,16 +20,14 @@ enum class EdgeType {
     Directed, Undirected
 }
 
-val singapore = Airport("Singapore")
-val hongKong = Airport("Hong Kong")
-val tokyo = Airport("Tokyo")
-val detroit = Airport("Detroit")
-val dc = Airport("Washington DC")
-val sanFran = Airport("San Francisco")
-val austin = Airport("Austin")
-val seattle = Airport("Seattle")
-
-typealias FlightPlan = MutableMap<Airport, List<Route>>
+private val singapore = Airport("Singapore")
+private val hongKong = Airport("Hong Kong")
+private val tokyo = Airport("Tokyo")
+private val detroit = Airport("Detroit")
+private val dc = Airport("Washington DC")
+private val sanFran = Airport("San Francisco")
+private val austin = Airport("Austin")
+private val seattle = Airport("Seattle")
 
 fun main() {
 
@@ -63,7 +63,7 @@ fun main() {
 
 }
 
-fun FlightPlan.connectFlights() {
+private fun FlightPlan.connectFlights() {
     add(EdgeType.Undirected, Route(singapore, hongKong, 300.0))
     add(EdgeType.Undirected, Route(tokyo, singapore, 500.0))
     add(EdgeType.Undirected, Route(hongKong, tokyo, 250.0))
@@ -103,7 +103,7 @@ fun FlightPlan.dfs(from: Airport): List<Airport> {
     return seen.toList()
 }
 
-fun FlightPlan.dfsHelper(from: Airport, seen: MutableSet<Airport>) {
+private fun FlightPlan.dfsHelper(from: Airport, seen: MutableSet<Airport>) {
     this[from]?.let {
         it.forEach {
             if (it.to !in seen) {
@@ -133,7 +133,7 @@ fun FlightPlan.bfs(from: Airport): List<Airport> {
 }
 
 // dijkstra
-fun FlightPlan.cheapestFlight(from: Airport, to: Airport? = null) {
+fun FlightPlan.cheapestFlight(from: Airport, to: Airport? = null): Double? {
     val seen = mutableSetOf<Airport>()
     val queue = PriorityQueue<Flight>()
     val costPerDestination = mutableMapOf<Airport, Double>()
@@ -157,6 +157,7 @@ fun FlightPlan.cheapestFlight(from: Airport, to: Airport? = null) {
     if (to != null) {
         // desired final airport
         println(costPerDestination[to] ?: "Airport ${to.name} not reachable from ${from.name}")
+        return costPerDestination[to]
     } else {
         // show all the reachable airports for source
         println(costPerDestination.map {
@@ -165,4 +166,5 @@ fun FlightPlan.cheapestFlight(from: Airport, to: Airport? = null) {
             }
         })
     }
+    return null
 }
